@@ -51,8 +51,7 @@ debug_log = False          # If $debug_log is a filename, it'll be used.
 # ============================================================================
 def ss_get_mysql_stats(options):
     # Process connection options and connect to MySQL.
-    global debug, mysql_user, mysql_pass, heartbeat, cache_dir, poll_time, chk_options, \
-            mysql_port, mysql_ssl
+    global cache_dir, poll_time, chk_options
         
     # Connect to MySQL.
     host = options.host
@@ -67,7 +66,7 @@ def ss_get_mysql_stats(options):
     sanitized_host = host.replace(':', '').replace('/', '_')
     sanitized_host = sanitized_host + '_' + str(port)
     cache_file = os.path.join(cache_dir, '%s-mysql_graphite_stats.txt' % (sanitized_host))
-    log_debug('Cache file is %s' % (cache_file));
+    log_debug('Cache file is %s' % (cache_file))
     
     # First, check the cache.
     fp = None
@@ -222,7 +221,7 @@ def ss_get_mysql_stats(options):
             # MySQL 5.5 replaces the 'Locked' state with a variety of "Waiting for
             # X lock" types of statuses.  Wrap these all back into "Locked" because
             # we don't really care about the type of locking it is.
-            state = re.sub('/^(Table lock|Waiting for .*lock)$/', 'Locked', state)
+            state = re.sub('^(Table lock|Waiting for .*lock)$', 'Locked', state)
             state = state.replace(' ', '_')
             if 'State_%s' % (state) in status.keys():
                 increment(status, 'State_%s' % (state), 1)
@@ -241,9 +240,9 @@ def ss_get_mysql_stats(options):
             i = 0
             cursor.execute(
                 '''
-                SELECT `count`, total * 1000000 AS total "
-                   . "FROM INFORMATION_SCHEMA.QUERY_RESPONSE_TIME "
-                   . "WHERE `time` <> 'TOO LONG'
+                SELECT `count`, total * 1000000 AS total
+                FROM INFORMATION_SCHEMA.QUERY_RESPONSE_TIME
+                WHERE `time` <> 'TOO LONG'
                 '''
             )
             result = cursor.fetchall()
@@ -523,6 +522,7 @@ def ss_get_mysql_stats(options):
     if fp is not None:
         with open(cache_file, 'w+') as fp:
             fp.write('%s\n' % result)
+    db.close()
     return result
         
 # ============================================================================
@@ -770,7 +770,7 @@ def get_innodb_array(text):
             # Hash table size 4425293, used cells 4229064, ....
             # Hash table size 57374437, node heap has 72964 buffer(s) <-- no used cells
             result['hash_index_cells_total'] = to_int(row[3])
-            result['hsh_index_cells_used'] = to_int(row[6]) if line.find('used cells') > 0 else '0'
+            result['hash_index_cells_used'] = to_int(row[6]) if line.find('used cells') > 0 else '0'
             
         # LOG
         elif line.find(' log i/o\'s done, ') > 0:
@@ -1002,7 +1002,7 @@ if __name__ == "__main__":
     parser.add_argument('--heartbeat', help='MySQL heartbeat table (see pt-heartbeat)', default=heartbeat)
     parser.add_argument('--nocache', help='Do not cache results in a file', action='store_true')
     parser.add_argument('--graphite-host', help='Graphite host', default=graphite_host)
-    parser.add_argument('--graphite-port', help='Graphite port', default=graphite_port)
+    parser.add_argument('--graphite-port', help='Graphite port', default=graphite_port, type=int)
     parser.add_argument('--use-graphite', help='Send stats to Graphite', action='store_true')
     
     args = parser.parse_args()
