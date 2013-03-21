@@ -1011,16 +1011,152 @@ if __name__ == "__main__":
     result = ss_get_mysql_stats(args)
     log_debug(result)
     
+    derivative_var_names = [
+        'Aborted_clients',
+        'Aborted_connects',
+        'Binlog_cache_disk_use',
+        'Binlog_cache_use',
+        'Bytes_received',
+        'Bytes_sent',
+        'Com_delete',
+        'Com_delete_multi',
+        'Com_insert',
+        'Com_insert_select',
+        'Com_load',
+        'Com_replace',
+        'Com_replace_select',
+        'Com_select',
+        'Com_update',
+        'Com_update_multi',
+        'Connections',
+        'Created_tmp_disk_tables',
+        'Created_tmp_files',
+        'Created_tmp_tables',
+        'Handler_commit',
+        'Handler_delete',
+        'Handler_read_first',
+        'Handler_read_key',
+        'Handler_read_next',
+        'Handler_read_prev',
+        'Handler_read_rnd',
+        'Handler_read_rnd_next',
+        'Handler_rollback',
+        'Handler_savepoint',
+        'Handler_update',
+        'Handler_write',
+        'Innodb_row_lock_time',
+        'Innodb_row_lock_waits',
+        'Key_read_requests',
+        'Key_reads',
+        'Key_write_requests',
+        'Key_writes',
+        'Opened_tables',
+        'Qcache_hits',
+        'Qcache_inserts',
+        'Qcache_lowmem_prunes',
+        'Qcache_not_cached',
+        'Query_time_count_00',
+        'Query_time_count_01',
+        'Query_time_count_02',
+        'Query_time_count_03',
+        'Query_time_count_04',
+        'Query_time_count_05',
+        'Query_time_count_06',
+        'Query_time_count_07',
+        'Query_time_count_08',
+        'Query_time_count_09',
+        'Query_time_count_10',
+        'Query_time_count_11',
+        'Query_time_count_12',
+        'Query_time_count_13',
+        'Query_time_total_00',
+        'Query_time_total_01',
+        'Query_time_total_02',
+        'Query_time_total_03',
+        'Query_time_total_04',
+        'Query_time_total_05',
+        'Query_time_total_06',
+        'Query_time_total_07',
+        'Query_time_total_08',
+        'Query_time_total_09',
+        'Query_time_total_10',
+        'Query_time_total_11',
+        'Query_time_total_12',
+        'Query_time_total_13',
+        'Questions',
+        'Select_full_join',
+        'Select_full_range_join',
+        'Select_range',
+        'Select_range_check',
+        'Select_scan',
+        'Slave_retried_transactions',
+        'Slow_queries',
+        'Sort_merge_passes',
+        'Sort_range',
+        'Sort_rows',
+        'Sort_scan',
+        'Table_locks_immediate',
+        'Table_locks_waited',
+        'Threads_created',
+        'file_fsyncs',
+        'file_reads',
+        'file_writes',
+        'ibuf_inserts',
+        'ibuf_merged',
+        'ibuf_merges',
+        'innodb_transactions',
+        'log_bytes_flushed',
+        'log_bytes_written',
+        'log_writes',
+        'os_waits',
+        'pages_created',
+        'pages_read',
+        'pages_written',
+        'rows_deleted',
+        'rows_inserted',
+        'rows_read',
+        'rows_updated',
+        'spin_rounds',
+        'spin_waits',
+    ]
     output = []
-    unix_ts = int(time.time())
     sanitized_host = args.host.replace(':', '').replace('.', '').replace('/', '_')
     sanitized_host = sanitized_host + '_' + str(args.port)
+    graphite_ts = os.path.join(cache_dir, '%s-last.txt' % (sanitized_host))
+    
+    # Get Previous Stats and Timestamp
+    try:
+        with open(graphite_ts, 'r') as fp:
+            lines = fp.readlines()
+            prev_ts = int(lines[0])
+            prev_stats = lines[1]
+    except IOError:
+        prev_ts = None
+        prev_stats = ''
+    prev_stats_dict = {}
+    for stat in prev_stats.split():
+        k,v = stat.split(':')
+        prev_stats_dict[k] = v
+    
+    unix_ts = int(time.time())
     for stat in result.split():
         var_name, val = stat.split(':')
+        if var_name in derivative_var_names:
+            if prev_ts is None:
+                val = 0
+            else:
+                elapsed_time = float(unix_ts - prev_ts)
+                val = float(val)-float(prev_stats_dict.get(var_name, 0))
+                val = val/elapsed_time
         output.append('mysql.%s.%s %s %d' % (sanitized_host, var_name, val, unix_ts))   
+    
     output = set(output)
     log_debug(['Final result', output])
     if args.use_graphite:
+        # Write current timestamp
+        with open(graphite_ts, 'w+') as fp:
+            fp.write('%s\n%s' % (str(unix_ts), result))
+    
         # Send to graphite
         sock = socket()
         try:
