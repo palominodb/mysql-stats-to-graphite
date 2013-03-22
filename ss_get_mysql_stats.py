@@ -30,6 +30,8 @@ mysql_port = 3306
 graphite_host = '127.0.0.1'
 graphite_port = 2003
 
+no_replication_client = False   # prevent the queries needing "REPLICATION CLIENT" from running
+no_super = False                #  prevent queries needing SUPER from running
 heartbeat  = ''            # db.tbl if you use pt-heartbeat from Percona Toolkit.
 cache_dir  = '/tmp'        # If set, this uses caching to avoid multiple calls.
 poll_time  = 300           # Adjust to match your polling interval.
@@ -156,7 +158,7 @@ def ss_get_mysql_stats(options):
         status[row.get('variable_name')] = row.get('value')
      
     # Get SHOW SLAVE STATUS 
-    if chk_options.get('slave'):
+    if chk_options.get('slave') and not options.no_replication_client:
         cursor.execute('SHOW SLAVE STATUS')
         result = cursor.fetchall()
         slave_status_row_gotten = 0
@@ -192,7 +194,7 @@ def ss_get_mysql_stats(options):
             log_debug('Got nothing from SHOW SLAVE STATUS')
     
     # Get SHOW MASTER STATUS
-    if chk_options.get('master') and status.get('log_bin') == 'ON':
+    if chk_options.get('master') and not options.no_super and status.get('log_bin') == 'ON':
         binlogs = []
         cursor.execute('SHOW MASTER LOGS')
         result = cursor.fetchall()
@@ -749,6 +751,7 @@ def get_innodb_array(text):
             result['ibuf_cell_count'] = to_int(row[12])
         elif line.find('Ibuf: size ') == 0:
             # Ibuf: size 1, free list len 4634, seg size 4636,
+            # Ibuf: size 1, free list len 0, seg size 2, 0 merges
             result['ibuf_used_cells'] = to_int(row[2])
             result['ibuf_free_cells'] = to_int(row[6])
             result['ibuf_cell_count'] = to_int(row[9])
@@ -1000,6 +1003,9 @@ if __name__ == "__main__":
     parser.add_argument('--user', help='MySQL username', default=mysql_user)
     parser.add_argument('--password', help='MySQL password', default=mysql_pass)
     parser.add_argument('--heartbeat', help='MySQL heartbeat table (see pt-heartbeat)', default=heartbeat)
+    parser.add_argument('--no-replication-client', help='Prevent the queries needing "REPLICATION CLIENT" from running',
+                        action='store_true', default=no_replication_client)
+    parser.add_argument('--no-super', help='Prevent the queries needing "SUPER" from running', action='store_true', default=no_super)
     parser.add_argument('--nocache', help='Do not cache results in a file', action='store_true')
     parser.add_argument('--graphite-host', help='Graphite host', default=graphite_host)
     parser.add_argument('--graphite-port', help='Graphite port', default=graphite_port, type=int)
