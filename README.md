@@ -27,4 +27,4 @@ ss_get_mysql_stats.py \[-h\] --host HOST \[--port PORT\] \[--user USER\] \[--pas
     --graphite-port GRAPHITE_PORT Graphite port (default: 8080)  
     --use-graphite        Send stats to Graphite (default: False)  
 
-*RDS users will probably need to use both the --no-replication-client and --no-super flags to prevent errors.*
+*Note: RDS users will probably need to use both the --no-replication-client and --no-super flags to prevent errors.*
