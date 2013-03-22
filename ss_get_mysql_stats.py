@@ -755,7 +755,7 @@ def get_innodb_array(text):
             result['ibuf_used_cells'] = to_int(row[2])
             result['ibuf_free_cells'] = to_int(row[6])
             result['ibuf_cell_count'] = to_int(row[9])
-            if line.find('merges'):
+            if line.find('merges') != -1:
                 result['ibuf_merges'] = to_int(row[10])
         elif line.find('delete mark ') > 0 and prev_line.find('merged operations:') == 0:
             # Output of show engine innodb status has changed in 5.5
